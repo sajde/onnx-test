@@ -8,28 +8,42 @@
 </head>
 <body>
     <script>
-        async function runModel() {
-            // Modell laden
-            const session = await ort.InferenceSession.create('signature_extractor.onnx');
-            console.log("Modell geladen!");
+		async function runModel() {
+			// Modell laden
+			const session = await ort.InferenceSession.create('signature_extractor.onnx');
+			console.log("Model loaded!");
 
-            // Dummy-Eingabedaten erstellen
-            const inputText = "John Doe\nSenior Developer\nTechCorp Inc.\nwww.techcorp.com\n+1-800-555-1234";
-            const inputTensor = new ort.Tensor(
-                'float32',
-                new Float32Array(inputText.split('').map(c => c.charCodeAt(0)).concat(Array(256 - inputText.length).fill(0))),
-                [1, 256]
-            );
+			// Beispiel-Eingabetext
+			const inputText = `John Doe
+		Senior Developer
+		TechCorp Inc.
+		www.techcorp.com
+		+1-800-555-1234`;
 
-            // Vorhersage
-            const feeds = { input: inputTensor };
-            const results = await session.run(feeds);
+			// Text in Unicode-Werte konvertieren
+			const maxLen = 256;
+			const inputTensor = new ort.Tensor(
+				'float32',
+				new Float32Array(inputText.split('').map(c => c.charCodeAt(0)).concat(Array(maxLen - inputText.length).fill(0))),
+				[1, maxLen]
+			);
 
-            // Ausgabe anzeigen
-            console.log("Ergebnis:", results.output.data);
-        }
+			// Vorhersage
+			const feeds = { input: inputTensor };
+			const results = await session.run(feeds);
 
-        runModel();
+			// Kategorien und Ergebnisse
+			const categories = ["Name", "Company", "Website", "Phone"];
+			const predictions = results.output.data;
+
+			// Ausgabe
+			console.log("Extracted values:");
+			categories.forEach((category, index) => {
+				console.log(`${category}: ${predictions[index]}`);
+			});
+		}
+
+		runModel();
     </script>
 </body>
 </html>
