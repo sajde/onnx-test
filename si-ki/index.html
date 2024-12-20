@@ -32,12 +32,15 @@ www.techcorp.com
             // Eingabetext aus dem Textfeld
             const inputText = document.getElementById('signatureInput').value.trim();
         
-            // Text in Unicode-Werte konvertieren
+            // Text in Unicode-Werte konvertieren und in BigInt umwandeln
             const maxLen = 256; // Maximale Eingabelänge
-            const inputArray = inputText.split('').map(c => c.charCodeAt(0)).concat(Array(maxLen - inputText.length).fill(0));
+            const inputArray = inputText
+                .split('')
+                .map(c => BigInt(c.charCodeAt(0))) // Unicode-Werte in BigInt umwandeln
+                .concat(Array(maxLen - inputText.length).fill(BigInt(0))); // Padding hinzufügen
             
             // Tensor explizit als int64 definieren
-            const inputTensor = new ort.Tensor('int64', BigInt64Array.from(inputArray), [1, maxLen]);
+            const inputTensor = new ort.Tensor('int64', new BigInt64Array(inputArray), [1, maxLen]);
         
             // Vorhersage durchführen
             try {
