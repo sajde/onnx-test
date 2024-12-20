@@ -46,6 +46,8 @@ www.techcorp.com
 
             // Ausgabe verarbeiten
             const rawOutput = results.output.data;
+            console.log("Raw output:", rawOutput);
+            console.log("Output length:", rawOutput.length);
             const outputText = String.fromCharCode(...rawOutput).trim();
             const [name, company, website, phone] = outputText.split('|');
 
