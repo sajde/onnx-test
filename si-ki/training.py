@@ -1,61 +1,40 @@
 import json
 import torch
+from torch.utils.data import Dataset, DataLoader
 import torch.nn as nn
 import torch.optim as optim
-import re
 
-# **Daten laden**
-def load_training_data(file_path):
-    with open(file_path, 'r') as f:
-        data = json.load(f)
-    return data
+# **Dataset-Klasse**
+class SignatureDataset(Dataset):
+    def __init__(self, data_file, max_len=256):
+        with open(data_file, 'r') as f:
+            data = json.load(f)
+        self.inputs = [d['input'] for d in data]
+        self.outputs = [d['output'] for d in data]
+        self.max_len = max_len
 
-# Vorverarbeitung: Extraktion und Vektorisierung
-def preprocess_data(data):
-    inputs, outputs = [], []
-    for entry in data:
-        signature = entry["signature"]
-        inputs.append(signature)
+    def __len__(self):
+        return len(self.inputs)
 
-        # Kombinieren der Zielwerte zu einem stringbasierten Format
-        outputs.append({
-            "name": entry["name"],
-            "company": entry["company"],
-            "website": entry["website"],
-            "phone": entry["phone"]
-        })
-    return inputs, outputs
+    def __getitem__(self, idx):
+        input_text = self.inputs[idx]
+        output = self.outputs[idx]
 
-# Textvektorisierung (dummy): In realen Szenarien kannst du einen Text-Encoder verwenden
-def vectorize_text(text, max_len=256):
-    vector = [ord(c) for c in text[:max_len]]  # Konvertiere Zeichen zu Unicode-Werten
-    return vector + [0] * (max_len - len(vector))  # Padding
+        # Konvertiere Eingabe und Ausgabe zu Unicode-Vektoren
+        input_vector = [ord(c) for c in input_text[:self.max_len]] + [0] * (self.max_len - len(input_text))
+        output_vector = [
+            len(output["name"]), len(output["company"]),
+            len(output["website"]), len(output["phone"])
+        ]
 
-# Trainingsdaten laden
+        return torch.tensor(input_vector, dtype=torch.float32), torch.tensor(output_vector, dtype=torch.float32)
+
+# **Dataset laden**
 data_file = 'training_data.json'
-training_data = load_training_data(data_file)
-inputs, outputs = preprocess_data(training_data)
+dataset = SignatureDataset(data_file)
+dataloader = DataLoader(dataset, batch_size=4, shuffle=True)
 
-# Vektorisieren
-max_len = 256  # Maximale Länge der Signatur
-input_vectors = [vectorize_text(text, max_len) for text in inputs]
-
-# Dummy-Ausgabevektoren (z. B. Indexnummern von Kategorien, in echten Modellen komplexer)
-output_vectors = [
-    [
-        len(entry["name"]),  # Länge des Namens als Dummy-Ausgabe
-        len(entry["company"]),  # Länge der Firma
-        len(entry["website"]),  # Länge der Website
-        len(entry["phone"])  # Länge der Telefonnummer
-    ]
-    for entry in outputs
-]
-
-# Tensoren erstellen
-input_tensors = torch.tensor(input_vectors, dtype=torch.float32)
-output_tensors = torch.tensor(output_vectors, dtype=torch.float32)
-
-# Modell erstellen
+# **Modell erstellen**
 class SignatureExtractor(nn.Module):
     def __init__(self, input_size, hidden_size, output_size):
         super(SignatureExtractor, self).__init__()
@@ -67,38 +46,34 @@ class SignatureExtractor(nn.Module):
         x = self.fc2(x)
         return x
 
-# Parameter
-input_size = max_len
+# Modell-Parameter
+input_size = 256  # Maximale Länge des Textes
 hidden_size = 128
-output_size = 4  # Name, Firma, Website, Telefonnummer
+output_size = 4  # Name, Company, Website, Phone
 
-# Modell initialisieren
+# Initialisiere Modell, Optimierer und Verlustfunktion
 model = SignatureExtractor(input_size, hidden_size, output_size)
-
-# Optimierer und Verlustfunktion
-criterion = nn.MSELoss()
 optimizer = optim.Adam(model.parameters(), lr=0.001)
+criterion = nn.MSELoss()
 
-# Training
+# **Training**
 epochs = 50
 for epoch in range(epochs):
-    optimizer.zero_grad()
-    predictions = model(input_tensors)
-    loss = criterion(predictions, output_tensors)
-    loss.backward()
-    optimizer.step()
-
+    for inputs, outputs in dataloader:
+        optimizer.zero_grad()
+        predictions = model(inputs)
+        loss = criterion(predictions, outputs)
+        loss.backward()
+        optimizer.step()
     if epoch % 10 == 0:
-        print(f'Epoch {epoch}, Loss: {loss.item()}')
+        print(f"Epoch {epoch}, Loss: {loss.item()}")
 
-# Modell exportieren
-dummy_input = torch.randn(1, max_len)
+# Modell speichern
 torch.onnx.export(
     model,
-    dummy_input,
+    torch.randn(1, input_size),
     "signature_extractor.onnx",
     input_names=["input"],
     output_names=["output"]
 )
-
-print("Modell erfolgreich exportiert als 'signature_extractor.onnx'")
+print("Model successfully saved!")
