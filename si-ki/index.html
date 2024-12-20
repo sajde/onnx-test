@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Signatur-Extraktion</title>
+    <script src="ort.min.js"></script>
+</head>
+<body>
+    <script>
+        async function runModel() {
+            // Modell laden
+            const session = await ort.InferenceSession.create('signature_extractor.onnx');
+            console.log("Modell geladen!");
+
+            // Dummy-Eingabedaten erstellen
+            const inputText = "John Doe\nSenior Developer\nTechCorp Inc.\nwww.techcorp.com\n+1-800-555-1234";
+            const inputTensor = new ort.Tensor(
+                'float32',
+                new Float32Array(inputText.split('').map(c => c.charCodeAt(0)).concat(Array(256 - inputText.length).fill(0))),
+                [1, 256]
+            );
+
+            // Vorhersage
+            const feeds = { input: inputTensor };
+            const results = await session.run(feeds);
+
+            // Ausgabe anzeigen
+            console.log("Ergebnis:", results.output.data);
+        }
+
+        runModel();
+    </script>
+</body>
+</html>
